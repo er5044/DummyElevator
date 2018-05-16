@@ -1,9 +1,9 @@
 package com.org1.elevatorsystem.impl;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.StampedLock;
 
 import com.org1.elevatorsystem.MoveLocation;
@@ -32,6 +32,8 @@ public class Elevator implements ElevatorAPI{
 		this.locationAddChecker = locationAddChecker;
 		locationQueue= new PriorityBlockingQueue<>();
 		elevatorPanel = new ElevatorPanelImpl();
+		stateSubscribers = new ArrayList<ElevatorStateSubscriber>();
+		lock = new StampedLock();
 	}
 
 	@Override
@@ -55,7 +57,7 @@ public class Elevator implements ElevatorAPI{
 		elevatorState.setElevatorState(State.MOVING);
 		MoveLocation currentLocation = elevatorState.getLocation(); 
 		while(currentLocation.getFloorNumber() != location.getFloorNumber()) {
-			Thread.sleep(5000);
+			Thread.sleep(1500);
 			incrementDecrementFloorNumber();
 			publishState();
 		}
@@ -65,7 +67,7 @@ public class Elevator implements ElevatorAPI{
 
 	private void handleFloorReached() throws InterruptedException {
 		openDoor();
-		Thread.sleep(10000);
+		Thread.sleep(100);
 		closeDoor();
 	}
 
@@ -88,14 +90,17 @@ public class Elevator implements ElevatorAPI{
 	private void changeDirectionIfRequired(MoveLocation location) {
 		Direction d =null;
 		if(elevatorState.getLocation().getFloorNumber()>location.getFloorNumber()) {
-			d = Direction.UP;
-		}else if(elevatorState.getLocation().getFloorNumber()>location.getFloorNumber()) {
 			d = Direction.DOWN;
+		}else if(elevatorState.getLocation().getFloorNumber()<location.getFloorNumber()) {
+			d = Direction.UP;
 		}
-		Lock wLock = lock.asWriteLock();
-		wLock.lock();
+		Long stamp = lock.writeLock();
+		try {
 			elevatorState.getLocation().setDirection(d);
-		wLock.unlock();
+		}finally {
+			lock.unlockWrite(stamp);	
+		}
+		
 	}
 
 	@Override
@@ -105,7 +110,12 @@ public class Elevator implements ElevatorAPI{
 
 	@Override
 	public ElevatorState getElevatorState() throws CloneNotSupportedException {
-		return elevatorState.clone();
+		Long stamp = lock.readLock();
+		try {
+			return elevatorState.clone();
+		}finally {
+			lock.unlockRead(stamp);
+		}
 	}
 
 	@Override
@@ -120,13 +130,13 @@ public class Elevator implements ElevatorAPI{
 
 	@Override
 	public void openDoor() {
-		System.out.println("Door Opened");
+		System.out.println(getElevatorName()+ " Door Opened");
 		elevatorState.setElevatorState(State.DOOROPEN);
 	}
 
 	@Override
 	public void closeDoor() {
-		System.out.println("Door Opened");
+		System.out.println(getElevatorName()+" Door Closed");
 		elevatorState.setElevatorState(State.WAIT);		
 	}
 
@@ -135,6 +145,9 @@ public class Elevator implements ElevatorAPI{
 		stateSubscribers.add(subscriber);
 	}
 
+	private String getElevatorName() {
+		return "Elevator "+ getId();
+	}
 
 	@Override
 	public boolean addLocation(MoveLocation loc) {

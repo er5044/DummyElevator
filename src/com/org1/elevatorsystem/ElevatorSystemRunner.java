@@ -22,7 +22,7 @@ public class ElevatorSystemRunner {
 					@Override
 					public void run() {
 						try {
-							Thread.sleep(1100L);
+							Thread.sleep(100L);
 							runner.submitFloorPanelRequests(properties, runner.system);
 						} catch (InterruptedException e) {
 							// TODO Auto-generated catch block
@@ -37,7 +37,7 @@ public class ElevatorSystemRunner {
 						@Override
 						public void run() {
 							try {
-								Thread.sleep(1500L);
+								Thread.sleep(130L);
 								runner.submitElevatorPanelRequests(properties, entry.getValue(),entry.getKey());
 							} catch (InterruptedException e) {
 								// TODO Auto-generated catch block
